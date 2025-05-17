@@ -1,0 +1,12 @@
+
+/local_model/
+/*.safetensors
+*.bin
+*.pt
+*.ckpt
+
+
+__pycache__/
+*.pyc
+*.pyo
+~/.cache/

@@ -3,14 +3,7 @@ import pandas as pd
 import bcrypt
 from datetime import datetime
 from text_classification import get_sentiment_label
-from transformers import pipeline
-
-# Initialize chatbot model pipeline once
-@st.cache_resource
-def load_chat_model():
-    return pipeline("text-generation", model="tiiuae/falcon-7b-instruct", tokenizer="tiiuae/falcon-7b-instruct", max_new_tokens=100)
-
-chat_model = load_chat_model()
+from local_model.therapyllama import generate_response
 
 USERS_FILE = "users.csv"
 CHAT_LOGS_FILE = "chat_logs.csv"
@@ -57,9 +50,6 @@ def save_chat(username, user_msg, bot_msg):
 def delete_chat(username):
     try:
         logs = pd.read_csv(CHAT_LOGS_FILE)
-        if "username" not in logs.columns:
-            st.error("Chat logs missing 'username' column.")
-            return
         logs = logs[logs["username"] != username]
         logs.to_csv(CHAT_LOGS_FILE, index=False)
     except FileNotFoundError:
@@ -67,16 +57,15 @@ def delete_chat(username):
 
 def get_bot_response(user_input):
     prompt = f"You are a kind and empathetic therapist. A user says: \"{user_input}\". How would you respond?"
-    response = chat_model(prompt)[0]["generated_text"]
-    return response.replace(prompt, "").strip()
+    return generate_response(prompt)
 
 def sentiment_color(sentiment):
-    if sentiment == "positive":
+    if sentiment.lower() == "positive":
         return "green"
-    elif sentiment == "negative":
+    elif sentiment.lower() == "negative":
         return "red"
     else:
-        return "#d4a017"
+        return "#d4a017"  # Neutral yellow
 
 # Session management
 if "logged_in" not in st.session_state:

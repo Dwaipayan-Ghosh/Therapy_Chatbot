@@ -5,3 +5,4 @@ transformers
 seaborn
 torch
 bcrypt
+llama-cpp-python

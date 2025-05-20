@@ -10,3 +10,6 @@ timestamp,user,bot,username,user_message,user_sentiment,bot_response,bot_sentime
 2025-05-20 17:32:20.303114,What is the color of apple,"Hello, Aron. The color of an apple is typically red, although there can be variations such as green, yellow, or even a combination of different colors. Could you tell me more about why you are asking?</s>",,,,,
 2025-05-20 18:15:59.461161,,,user1,Hello,positive,I see. Could you tell me more about that?,neutral
 2025-05-20 18:16:06.614233,,,user1,I am not well,negative,I see. Could you tell me more about that?,neutral
+2025-05-20 23:27:19.843743,,,user1,Hello,positive,A</s>,positive
+2025-05-20 23:28:04.000989,,,user1,I am not well,negative,"I'm here for you, Leong. Could you tell me more about what you mean by ""not well""?</s>",neutral
+2025-05-20 23:28:52.306223,,,user1,I have fever,neutral,"""Hi Kala, I'm here to help. I'm curious, how are you feeling right now?""</s>",neutral

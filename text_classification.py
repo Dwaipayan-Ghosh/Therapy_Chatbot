@@ -26,9 +26,3 @@ def get_sentiment_label(query):
     
     # Return the sentiment label of the analyzed text
     return res[0]['label']
-
-
-# Example usage:
-# query = "Covid cases are increasing fast!"
-# sentiment_label = get_sentiment_label(query)
-# print("Sentiment Label:", sentiment_label)

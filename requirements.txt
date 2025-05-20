@@ -4,3 +4,4 @@ pandas
 transformers
 seaborn
 torch
+bcrypt

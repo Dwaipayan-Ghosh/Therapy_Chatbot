@@ -3,6 +3,14 @@ import pandas as pd
 import bcrypt
 from datetime import datetime
 from text_classification import get_sentiment_label
+from transformers import pipeline
+
+# Initialize chatbot model pipeline once
+@st.cache_resource
+def load_chat_model():
+    return pipeline("text-generation", model="tiiuae/falcon-7b-instruct", tokenizer="tiiuae/falcon-7b-instruct", max_new_tokens=100)
+
+chat_model = load_chat_model()
 
 USERS_FILE = "users.csv"
 CHAT_LOGS_FILE = "chat_logs.csv"
@@ -58,18 +66,9 @@ def delete_chat(username):
         pass
 
 def get_bot_response(user_input):
-    if "not feeling" in user_input:
-        return "Hi, I'm here to listen. Could you tell me more about how you're feeling?"
-    elif "broke my leg" in user_input:
-        return "I'm so sorry to hear that! Can you tell me more about what happened?"
-    elif "better now" in user_input:
-        return "That's wonderful to hear. Can you tell me what has improved since therapy?"
-    elif "new friend" in user_input:
-        return "That's wonderful! How did you meet this new friend?"
-    elif "color of apple" in user_input:
-        return "The color of an apple is typically red, but it can also be green or yellow."
-    else:
-        return "I see. Could you tell me more about that?"
+    prompt = f"You are a kind and empathetic therapist. A user says: \"{user_input}\". How would you respond?"
+    response = chat_model(prompt)[0]["generated_text"]
+    return response.replace(prompt, "").strip()
 
 def sentiment_color(sentiment):
     if sentiment == "positive":
@@ -77,8 +76,9 @@ def sentiment_color(sentiment):
     elif sentiment == "negative":
         return "red"
     else:
-        return "#d4a017"  # yellow
+        return "#d4a017"
 
+# Session management
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.username = ""
@@ -104,7 +104,7 @@ if not st.session_state.logged_in:
             if authenticate_user(username, password):
                 st.session_state.logged_in = True
                 st.session_state.username = username
-                st.rerun()  # updated from experimental_rerun()
+                st.rerun()
             else:
                 st.error("Invalid credentials.")
 

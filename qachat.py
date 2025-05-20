@@ -1,30 +1,54 @@
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import os
-os.environ["STREAMLIT_SERVER_RUN_ON_SAVE"] = "false"
-
 import streamlit as st
+from llama_cpp import Llama
+import pandas as pd
+import os
+from datetime import datetime
 
-# Load model and tokenizer locally
-model = AutoModelForCausalLM.from_pretrained("./local_model", torch_dtype=torch.float16).to("cuda")
+# Load GGUF model
+@st.cache_resource
+def load_model():
+    return Llama(
+        model_path="local_model\TherapyLlama-8B-v1-Q4_K_M.gguf",
+        n_ctx=2048,
+        n_threads=8,     # Use your CPU threads
+        n_batch=256,
+        verbose=False
+    )
 
-tokenizer = AutoTokenizer.from_pretrained("./local_model")
-model.eval()
+llm = load_model()
 
-# Text generation function
-def generate_response(prompt):
-    inputs = tokenizer(prompt, return_tensors="pt")
-    with torch.no_grad():
-        outputs = model.generate(**inputs, max_new_tokens=200, do_sample=True, top_p=0.95, temperature=0.7)
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+# Initialize CSV
+CSV_FILE = "chat_logs.csv"
+if not os.path.exists(CSV_FILE):
+    pd.DataFrame(columns=["timestamp", "user", "bot"]).to_csv(CSV_FILE, index=False)
 
-# Streamlit app
-st.set_page_config(page_title="Therapy Chatbot")
-st.header("🧠 Therapy Chatbot")
+# Streamlit UI
+st.title("🧠 Therapy Chatbot")
+st.markdown("Talk to a local therapy chatbot powered by **TherapyLlama 8B**")
 
-user_input = st.text_input("How are you feeling today?")
-submit = st.button("Talk")
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-if submit and user_input:
-    response = generate_response(user_input)
-    st.write(response)
+# Chat input
+user_input = st.text_input("You:", key="input")
+
+if user_input:
+    # Format prompt
+    prompt = f"User: {user_input}\nTherapist:"
+    
+    # Generate response
+    response = llm(prompt, max_tokens=512, stop=["User:", "Therapist:"], echo=False)
+    bot_output = response["choices"][0]["text"].strip()
+
+    # Display chat
+    st.session_state.chat_history.append(("You", user_input))
+    st.session_state.chat_history.append(("Therapist", bot_output))
+
+    # Save to CSV
+    chat_df = pd.read_csv(CSV_FILE)
+    chat_df.loc[len(chat_df)] = [datetime.now(), user_input, bot_output]
+    chat_df.to_csv(CSV_FILE, index=False)
+
+# Display conversation
+for role, msg in st.session_state.chat_history:
+    st.markdown(f"**{role}:** {msg}")

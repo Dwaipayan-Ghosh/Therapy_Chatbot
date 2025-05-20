@@ -1,54 +1,143 @@
 import streamlit as st
-from llama_cpp import Llama
 import pandas as pd
-import os
+import bcrypt
 from datetime import datetime
+from text_classification import get_sentiment_label
 
-# Load GGUF model
-@st.cache_resource
-def load_model():
-    return Llama(
-        model_path="local_model\TherapyLlama-8B-v1-Q4_K_M.gguf",
-        n_ctx=2048,
-        n_threads=8,     # Use your CPU threads
-        n_batch=256,
-        verbose=False
-    )
+USERS_FILE = "users.csv"
+CHAT_LOGS_FILE = "chat_logs.csv"
 
-llm = load_model()
+def load_users():
+    try:
+        return pd.read_csv(USERS_FILE)
+    except FileNotFoundError:
+        return pd.DataFrame(columns=["username", "password"])
 
-# Initialize CSV
-CSV_FILE = "chat_logs.csv"
-if not os.path.exists(CSV_FILE):
-    pd.DataFrame(columns=["timestamp", "user", "bot"]).to_csv(CSV_FILE, index=False)
+def save_users(users_df):
+    users_df.to_csv(USERS_FILE, index=False)
 
-# Streamlit UI
-st.title("🧠 Therapy Chatbot")
-st.markdown("Talk to a local therapy chatbot powered by **TherapyLlama 8B**")
+def signup_user(username, password):
+    users = load_users()
+    if username in users["username"].values:
+        return False
+    hashed_pw = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    new_user = pd.DataFrame([[username, hashed_pw]], columns=["username", "password"])
+    users = pd.concat([users, new_user], ignore_index=True)
+    save_users(users)
+    return True
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+def authenticate_user(username, password):
+    users = load_users()
+    user = users[users["username"] == username]
+    if not user.empty:
+        return bcrypt.checkpw(password.encode(), user.iloc[0]["password"].encode())
+    return False
 
-# Chat input
-user_input = st.text_input("You:", key="input")
+def save_chat(username, user_msg, bot_msg):
+    user_sentiment = get_sentiment_label(user_msg)
+    bot_sentiment = get_sentiment_label(bot_msg)
+    time = datetime.now()
+    new_entry = pd.DataFrame([[username, time, user_msg, user_sentiment, bot_msg, bot_sentiment]],
+                             columns=["username", "timestamp", "user_message", "user_sentiment", "bot_response", "bot_sentiment"])
+    try:
+        logs = pd.read_csv(CHAT_LOGS_FILE)
+        logs = pd.concat([logs, new_entry], ignore_index=True)
+    except FileNotFoundError:
+        logs = new_entry
+    logs.to_csv(CHAT_LOGS_FILE, index=False)
 
-if user_input:
-    # Format prompt
-    prompt = f"User: {user_input}\nTherapist:"
-    
-    # Generate response
-    response = llm(prompt, max_tokens=512, stop=["User:", "Therapist:"], echo=False)
-    bot_output = response["choices"][0]["text"].strip()
+def delete_chat(username):
+    try:
+        logs = pd.read_csv(CHAT_LOGS_FILE)
+        if "username" not in logs.columns:
+            st.error("Chat logs missing 'username' column.")
+            return
+        logs = logs[logs["username"] != username]
+        logs.to_csv(CHAT_LOGS_FILE, index=False)
+    except FileNotFoundError:
+        pass
 
-    # Display chat
-    st.session_state.chat_history.append(("You", user_input))
-    st.session_state.chat_history.append(("Therapist", bot_output))
+def get_bot_response(user_input):
+    if "not feeling" in user_input:
+        return "Hi, I'm here to listen. Could you tell me more about how you're feeling?"
+    elif "broke my leg" in user_input:
+        return "I'm so sorry to hear that! Can you tell me more about what happened?"
+    elif "better now" in user_input:
+        return "That's wonderful to hear. Can you tell me what has improved since therapy?"
+    elif "new friend" in user_input:
+        return "That's wonderful! How did you meet this new friend?"
+    elif "color of apple" in user_input:
+        return "The color of an apple is typically red, but it can also be green or yellow."
+    else:
+        return "I see. Could you tell me more about that?"
 
-    # Save to CSV
-    chat_df = pd.read_csv(CSV_FILE)
-    chat_df.loc[len(chat_df)] = [datetime.now(), user_input, bot_output]
-    chat_df.to_csv(CSV_FILE, index=False)
+def sentiment_color(sentiment):
+    if sentiment == "positive":
+        return "green"
+    elif sentiment == "negative":
+        return "red"
+    else:
+        return "#d4a017"  # yellow
 
-# Display conversation
-for role, msg in st.session_state.chat_history:
-    st.markdown(f"**{role}:** {msg}")
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.username = ""
+
+if not st.session_state.logged_in:
+    st.sidebar.title("Login / Signup")
+    menu = st.sidebar.radio("Menu", ["Login", "Signup"])
+
+    if menu == "Signup":
+        st.title("Create Account")
+        new_user = st.text_input("New Username")
+        new_pass = st.text_input("New Password", type="password")
+        if st.button("Signup"):
+            if signup_user(new_user, new_pass):
+                st.success("Account created! Please login.")
+            else:
+                st.error("Username already exists.")
+    else:
+        st.title("Login")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        if st.button("Login"):
+            if authenticate_user(username, password):
+                st.session_state.logged_in = True
+                st.session_state.username = username
+                st.rerun()  # updated from experimental_rerun()
+            else:
+                st.error("Invalid credentials.")
+
+if st.session_state.logged_in:
+    st.title("🧠 Therapy Chatbot")
+    st.markdown(f"Welcome, **{st.session_state.username}** 👋")
+
+    user_input = st.text_input("You:", key="input")
+
+    if st.button("Send"):
+        if user_input.strip():
+            bot_reply = get_bot_response(user_input)
+            st.markdown(f"**You:** {user_input}")
+            st.markdown(f"**Therapist:** {bot_reply}")
+            save_chat(st.session_state.username, user_input, bot_reply)
+
+    if st.button("Delete My Chat History"):
+        delete_chat(st.session_state.username)
+        st.success("Your chat history has been deleted.")
+
+    try:
+        logs = pd.read_csv(CHAT_LOGS_FILE)
+        user_logs = logs[logs["username"] == st.session_state.username]
+        if not user_logs.empty:
+            st.markdown("---")
+            st.subheader("📜 Your Chat History")
+            for _, row in user_logs.iterrows():
+                st.markdown(f"**🕒 {row['timestamp']}**")
+                st.markdown(
+                    f"<div style='color:{sentiment_color(row['user_sentiment'])}'>😐 <strong>You:</strong> {row['user_message']} <em>(Sentiment: {row['user_sentiment']})</em></div>",
+                    unsafe_allow_html=True)
+                st.markdown(
+                    f"<div style='color:{sentiment_color(row['bot_sentiment'])}'>🤖 <strong>Therapist:</strong> {row['bot_response']} <em>(Sentiment: {row['bot_sentiment']})</em></div><hr>",
+                    unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.info("No chat history found.")

@@ -13,3 +13,17 @@ timestamp,user,bot,username,user_message,user_sentiment,bot_response,bot_sentime
 2025-05-20 23:27:19.843743,,,user1,Hello,positive,A</s>,positive
 2025-05-20 23:28:04.000989,,,user1,I am not well,negative,"I'm here for you, Leong. Could you tell me more about what you mean by ""not well""?</s>",neutral
 2025-05-20 23:28:52.306223,,,user1,I have fever,neutral,"""Hi Kala, I'm here to help. I'm curious, how are you feeling right now?""</s>",neutral
+2025-05-20 23:44:17.546867,,,user1,"Hey, I won a medal",positive,,positive
+2025-05-20 23:45:34.263220,,,user1,I met an accident,neutral,>,neutral
+2025-05-20 23:51:40.668090,,,user1,I am not good,negative,"(Type 'respond' if you want to respond, 'reflect' if you want to reflect on the user's statement)</s>",neutral
+2025-05-20 23:52:19.941833,,,user1,respond,neutral,"""Hi Meehan, I'm glad to hear that you're feeling hopeful about the future. What specifically brings you hope?""</s>",positive
+2025-05-20 23:55:10.222444,,,user1,I am not well,negative,What questions would you ask?</s>,neutral
+2025-05-20 23:55:38.855413,,,user1,Hello,positive,"""Hi, I'm here to help. What's on your mind?""></s>",neutral
+2025-05-20 23:56:10.350226,,,user1,I am anxious,neutral,What would be your next question?</s>,neutral
+2025-05-22 00:28:19.189673,,,user1,"Hello, I am not well",negative,,positive
+2025-05-22 00:29:13.456775,,,user1,I am anxious,neutral,,positive
+2025-05-22 00:36:25.063458,,,user1,How are you?,neutral,,positive
+2025-05-22 00:41:52.775574,,,user1,"Hi, I am not well",,,
+2025-05-22 00:52:56.983299,,,user1,How are you?,,,
+2025-05-22 00:57:50.389765,,,user1,"Hello, How are you",,,
+2025-05-22 01:06:21.322340,,,user1,How are you?,,,

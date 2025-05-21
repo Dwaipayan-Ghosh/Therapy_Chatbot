@@ -2,12 +2,12 @@ import streamlit as st
 import pandas as pd
 import bcrypt
 from datetime import datetime
-from text_classification import get_sentiment_label
 from local_model.therapyllama import generate_response
 
 USERS_FILE = "users.csv"
 CHAT_LOGS_FILE = "chat_logs.csv"
 
+# --- User Management ---
 def load_users():
     try:
         return pd.read_csv(USERS_FILE)
@@ -34,12 +34,11 @@ def authenticate_user(username, password):
         return bcrypt.checkpw(password.encode(), user.iloc[0]["password"].encode())
     return False
 
+# --- Chat Logging ---
 def save_chat(username, user_msg, bot_msg):
-    user_sentiment = get_sentiment_label(user_msg)
-    bot_sentiment = get_sentiment_label(bot_msg)
     time = datetime.now()
-    new_entry = pd.DataFrame([[username, time, user_msg, user_sentiment, bot_msg, bot_sentiment]],
-                             columns=["username", "timestamp", "user_message", "user_sentiment", "bot_response", "bot_sentiment"])
+    new_entry = pd.DataFrame([[username, time, user_msg, bot_msg]],
+                             columns=["username", "timestamp", "user_message", "bot_response"])
     try:
         logs = pd.read_csv(CHAT_LOGS_FILE)
         logs = pd.concat([logs, new_entry], ignore_index=True)
@@ -59,19 +58,12 @@ def get_bot_response(user_input):
     prompt = f"You are a kind and empathetic therapist. A user says: \"{user_input}\". How would you respond?"
     return generate_response(prompt)
 
-def sentiment_color(sentiment):
-    if sentiment.lower() == "positive":
-        return "green"
-    elif sentiment.lower() == "negative":
-        return "red"
-    else:
-        return "#d4a017"  # Neutral yellow
-
-# Session management
+# --- Session State ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.username = ""
 
+# --- Login / Signup UI ---
 if not st.session_state.logged_in:
     st.sidebar.title("Login / Signup")
     menu = st.sidebar.radio("Menu", ["Login", "Signup"])
@@ -97,23 +89,33 @@ if not st.session_state.logged_in:
             else:
                 st.error("Invalid credentials.")
 
+# --- Main Chat UI ---
 if st.session_state.logged_in:
     st.title("🧠 Therapy Chatbot")
     st.markdown(f"Welcome, **{st.session_state.username}** 👋")
+
+    col1, col2 = st.columns([3, 1])
+    with col2:
+        if st.button("Logout"):
+            st.session_state.logged_in = False
+            st.session_state.username = ""
+            st.rerun()
 
     user_input = st.text_input("You:", key="input")
 
     if st.button("Send"):
         if user_input.strip():
             bot_reply = get_bot_response(user_input)
-            st.markdown(f"**You:** {user_input}")
-            st.markdown(f"**Therapist:** {bot_reply}")
+            st.session_state.last_input = user_input
+            st.session_state.last_reply = bot_reply
             save_chat(st.session_state.username, user_input, bot_reply)
+            st.rerun()
 
     if st.button("Delete My Chat History"):
         delete_chat(st.session_state.username)
         st.success("Your chat history has been deleted.")
 
+    # Display chat history
     try:
         logs = pd.read_csv(CHAT_LOGS_FILE)
         user_logs = logs[logs["username"] == st.session_state.username]
@@ -121,12 +123,17 @@ if st.session_state.logged_in:
             st.markdown("---")
             st.subheader("📜 Your Chat History")
             for _, row in user_logs.iterrows():
-                st.markdown(f"**🕒 {row['timestamp']}**")
                 st.markdown(
-                    f"<div style='color:{sentiment_color(row['user_sentiment'])}'>😐 <strong>You:</strong> {row['user_message']} <em>(Sentiment: {row['user_sentiment']})</em></div>",
-                    unsafe_allow_html=True)
-                st.markdown(
-                    f"<div style='color:{sentiment_color(row['bot_sentiment'])}'>🤖 <strong>Therapist:</strong> {row['bot_response']} <em>(Sentiment: {row['bot_sentiment']})</em></div><hr>",
-                    unsafe_allow_html=True)
+                    f"""
+                    <div style='background-color:#f0f0f5;padding:10px;border-radius:10px;margin-bottom:5px; color:#000;'>
+                        👤 <strong>You:</strong><br><span style='font-size:15px'>{row['user_message']}</span>
+                    </div>
+                    <div style='background-color:#e6f2ff;padding:10px;border-radius:10px;margin-bottom:10px; color:#000;'>
+                        🤖 <strong>Therapist:</strong><br><span style='font-size:15px'>{row['bot_response']}</span>
+                    </div>
+                    <div style='font-size:12px;color:#888;margin-bottom:15px;'>🕒 {row['timestamp']}</div>
+                    """,
+                    unsafe_allow_html=True
+                )
     except FileNotFoundError:
         st.info("No chat history found.")

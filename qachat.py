@@ -3,11 +3,18 @@ import pandas as pd
 import bcrypt
 from datetime import datetime
 from local_model.therapyllama import generate_response
+import os
 
 USERS_FILE = "users.csv"
 CHAT_LOGS_FILE = "chat_logs.csv"
 
 # --- User Management ---
+def safe_load_chat_logs():
+    if os.path.exists(CHAT_LOGS_FILE) and os.path.getsize(CHAT_LOGS_FILE) > 0:
+        return pd.read_csv(CHAT_LOGS_FILE)
+    else:
+        return pd.DataFrame(columns=["username", "timestamp", "user_message", "bot_response"])
+    
 def load_users():
     try:
         return pd.read_csv(USERS_FILE)
@@ -40,7 +47,7 @@ def save_chat(username, user_msg, bot_msg):
     new_entry = pd.DataFrame([[username, time, user_msg, bot_msg]],
                              columns=["username", "timestamp", "user_message", "bot_response"])
     try:
-        logs = pd.read_csv(CHAT_LOGS_FILE)
+        logs = safe_load_chat_logs()
         logs = pd.concat([logs, new_entry], ignore_index=True)
     except FileNotFoundError:
         logs = new_entry
@@ -48,7 +55,7 @@ def save_chat(username, user_msg, bot_msg):
 
 def delete_chat(username):
     try:
-        logs = pd.read_csv(CHAT_LOGS_FILE)
+        logs = safe_load_chat_logs()
         logs = logs[logs["username"] != username]
         logs.to_csv(CHAT_LOGS_FILE, index=False)
     except FileNotFoundError:
@@ -130,7 +137,7 @@ if st.session_state.logged_in:
 
     # Display chat history
     try:
-        logs = pd.read_csv(CHAT_LOGS_FILE)
+        logs = safe_load_chat_logs()
         user_logs = logs[logs["username"] == st.session_state.username]
         if not user_logs.empty:
             st.markdown("---")

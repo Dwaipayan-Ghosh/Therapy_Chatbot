@@ -53,10 +53,23 @@ def delete_chat(username):
         logs.to_csv(CHAT_LOGS_FILE, index=False)
     except FileNotFoundError:
         pass
-
 def get_bot_response(user_input):
-    prompt = f"You are a kind and empathetic therapist. A user says: \"{user_input}\". How would you respond?"
+    # Construct a system-style instruction and dialogue history
+    prompt = (
+        "System: You are a therapy chatbot. Only respond to emotional or mental health-related questions. "
+        "If the user asks unrelated questions (e.g., math, general knowledge, technical), refuse to answer and kindly redirect to therapy topics.\n\n"
+        
+        "User: I'm feeling really anxious lately.\n"
+        "Therapist: I'm sorry to hear that. Would you like to talk more about what's causing your anxiety?\n\n"
+        
+        "User: What's 2 + 2?\n"
+        "Therapist: I'm here to support your emotional and mental well-being. Let's focus on how you're feeling instead. Is something on your mind?\n\n"
+        
+        f"User: {user_input}\n"
+        "Therapist:"
+    )
     return generate_response(prompt)
+
 
 # --- Session State ---
 if "logged_in" not in st.session_state:

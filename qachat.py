@@ -2,158 +2,181 @@ import streamlit as st
 import pandas as pd
 import bcrypt
 from datetime import datetime
-from local_model.therapyllama import generate_response
 import os
+from local_model.therapyllama import generate_response  # Ensure this exists
 
 USERS_FILE = "users.csv"
 CHAT_LOGS_FILE = "chat_logs.csv"
 
 # --- User Management ---
-def safe_load_chat_logs():
-    if os.path.exists(CHAT_LOGS_FILE) and os.path.getsize(CHAT_LOGS_FILE) > 0:
-        return pd.read_csv(CHAT_LOGS_FILE)
-    else:
-        return pd.DataFrame(columns=["username", "timestamp", "user_message", "bot_response"])
-    
 def load_users():
     try:
-        return pd.read_csv(USERS_FILE)
+        return pd.read_csv(USERS_FILE, dtype={"name": str, "email": str, "password": str, "role": str})
     except FileNotFoundError:
-        return pd.DataFrame(columns=["username", "password"])
+        return pd.DataFrame(columns=["name", "email", "password", "role"])
 
 def save_users(users_df):
     users_df.to_csv(USERS_FILE, index=False)
 
-def signup_user(username, password):
+def signup_user(name, email, password, role):
     users = load_users()
-    if username in users["username"].values:
+    if email in users["email"].values:
         return False
     hashed_pw = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-    new_user = pd.DataFrame([[username, hashed_pw]], columns=["username", "password"])
+    new_user = pd.DataFrame([[name, email, hashed_pw, role]], columns=["name", "email", "password", "role"])
     users = pd.concat([users, new_user], ignore_index=True)
     save_users(users)
     return True
 
-def authenticate_user(username, password):
+def authenticate_user(email, password):
     users = load_users()
-    user = users[users["username"] == username]
+    user = users[users["email"] == email]
     if not user.empty:
-        return bcrypt.checkpw(password.encode(), user.iloc[0]["password"].encode())
-    return False
+        if bcrypt.checkpw(password.encode(), user.iloc[0]["password"].encode()):
+            return True, user.iloc[0]["name"], user.iloc[0]["role"]
+    return False, None, None
 
 # --- Chat Logging ---
-def save_chat(username, user_msg, bot_msg):
+def safe_load_chat_logs():
+    if os.path.exists(CHAT_LOGS_FILE) and os.path.getsize(CHAT_LOGS_FILE) > 0:
+        try:
+            return pd.read_csv(CHAT_LOGS_FILE)
+        except pd.errors.EmptyDataError:
+            return pd.DataFrame(columns=["email", "timestamp", "user_message", "bot_response"])
+    else:
+        return pd.DataFrame(columns=["email", "timestamp", "user_message", "bot_response"])
+
+def save_chat(email, user_msg, bot_msg):
     time = datetime.now()
-    new_entry = pd.DataFrame([[username, time, user_msg, bot_msg]],
-                             columns=["username", "timestamp", "user_message", "bot_response"])
-    try:
-        logs = safe_load_chat_logs()
-        logs = pd.concat([logs, new_entry], ignore_index=True)
-    except FileNotFoundError:
-        logs = new_entry
+    new_entry = pd.DataFrame([[email, time, user_msg, bot_msg]],
+                             columns=["email", "timestamp", "user_message", "bot_response"])
+    logs = safe_load_chat_logs()
+    logs = pd.concat([logs, new_entry], ignore_index=True)
     logs.to_csv(CHAT_LOGS_FILE, index=False)
 
-def delete_chat(username):
-    try:
-        logs = safe_load_chat_logs()
-        logs = logs[logs["username"] != username]
-        logs.to_csv(CHAT_LOGS_FILE, index=False)
-    except FileNotFoundError:
-        pass
+def delete_chat(email):
+    logs = safe_load_chat_logs()
+    logs = logs[logs["email"] != email]
+    logs.to_csv(CHAT_LOGS_FILE, index=False)
+
+# --- Therapy Bot Response ---
 def get_bot_response(user_input):
-    # Construct a system-style instruction and dialogue history
     prompt = (
         "System: You are a therapy chatbot. Only respond to emotional or mental health-related questions. "
         "If the user asks unrelated questions (e.g., math, general knowledge, technical), refuse to answer and kindly redirect to therapy topics.\n\n"
-        
         "User: I'm feeling really anxious lately.\n"
         "Therapist: I'm sorry to hear that. Would you like to talk more about what's causing your anxiety?\n\n"
-        
         "User: What's 2 + 2?\n"
         "Therapist: I'm here to support your emotional and mental well-being. Let's focus on how you're feeling instead. Is something on your mind?\n\n"
-        
         f"User: {user_input}\n"
         "Therapist:"
     )
     return generate_response(prompt)
 
-
-# --- Session State ---
+# --- Session Init ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-    st.session_state.username = ""
+    st.session_state.name = ""
+    st.session_state.email = ""
+    st.session_state.role = ""
 
-# --- Login / Signup UI ---
-if not st.session_state.logged_in:
-    st.sidebar.title("Login / Signup")
-    menu = st.sidebar.radio("Menu", ["Login", "Signup"])
+# --- Sidebar Navigation ---
+st.sidebar.title("Navigation")
+menu = st.sidebar.radio("Go to", ["Register", "Login"])
 
-    if menu == "Signup":
-        st.title("Create Account")
-        new_user = st.text_input("New Username")
-        new_pass = st.text_input("New Password", type="password")
-        if st.button("Signup"):
-            if signup_user(new_user, new_pass):
-                st.success("Account created! Please login.")
-            else:
-                st.error("Username already exists.")
-    else:
-        st.title("Login")
-        username = st.text_input("Username")
+# --- Registration Page ---
+if not st.session_state.logged_in and menu == "Register":
+    st.markdown("<h2 style='text-align: center;'>Register New User</h2>", unsafe_allow_html=True)
+    with st.form("signup_form"):
+        name = st.text_input("Full Name")
+        email = st.text_input("Email")
         password = st.text_input("Password", type="password")
-        if st.button("Login"):
-            if authenticate_user(username, password):
+        role = st.selectbox("Register as", options=["patient", "therapist"])
+        submitted = st.form_submit_button("Register")
+        if submitted:
+            if name and email and password:
+                if signup_user(name, email, password, role):
+                    st.success("Account created! Please log in.")
+                else:
+                    st.error("Email already exists.")
+            else:
+                st.warning("Please fill all fields.")
+
+# --- Login Page ---
+elif not st.session_state.logged_in and menu == "Login":
+    st.title("Login")
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
+    if st.button("Login"):
+        if email and password:
+            success, name, role = authenticate_user(email, password)
+            if success:
                 st.session_state.logged_in = True
-                st.session_state.username = username
+                st.session_state.name = name
+                st.session_state.email = email
+                st.session_state.role = role
                 st.rerun()
             else:
                 st.error("Invalid credentials.")
+        else:
+            st.warning("Please enter both email and password.")
 
-# --- Main Chat UI ---
+# --- Main Chat Interface ---
 if st.session_state.logged_in:
-    st.title("🧠 Therapy Chatbot")
-    st.markdown(f"Welcome, **{st.session_state.username}** 👋")
+    st.title("💬 TalkBuddy")
+    st.markdown(f"Welcome, **{st.session_state.name}** 👋 ({st.session_state.role})")
 
-    col1, col2 = st.columns([3, 1])
-    with col2:
-        if st.button("Logout"):
+    _, col_logout = st.columns([2, 1])
+    with col_logout:
+        if st.button("Logout➡️"):
             st.session_state.logged_in = False
-            st.session_state.username = ""
+            st.session_state.name = ""
+            st.session_state.email = ""
+            st.session_state.role = ""
             st.rerun()
 
-    user_input = st.text_input("You:", key="input")
+    if "input_text_value" not in st.session_state:
+        st.session_state.input_text_value = ""
 
-    if st.button("Send"):
-        if user_input.strip():
-            bot_reply = get_bot_response(user_input)
-            st.session_state.last_input = user_input
-            st.session_state.last_reply = bot_reply
-            save_chat(st.session_state.username, user_input, bot_reply)
+    user_input = st.text_input("You:", key="user_input_text", value=st.session_state.input_text_value)
+
+    col_send, col_delete = st.columns([1, 2])
+    with col_send:
+        if st.button("Send", key="send_button"):
+            if user_input.strip():
+                with st.spinner("Buddy is typing..."):
+                    bot_reply = get_bot_response(user_input)
+                save_chat(st.session_state.email, user_input, bot_reply)
+                st.session_state.input_text_value = ""
+                st.rerun()
+            else:
+                st.warning("Please type a message to send.")
+
+    with col_delete:
+        if st.button("Delete My Chat History", key="delete_history_button"):
+            delete_chat(st.session_state.email)
+            st.success("Your chat history has been deleted.")
             st.rerun()
 
-    if st.button("Delete My Chat History"):
-        delete_chat(st.session_state.username)
-        st.success("Your chat history has been deleted.")
+    st.markdown("---")
+    st.subheader("📜 Your Chat History")
 
-    # Display chat history
-    try:
-        logs = safe_load_chat_logs()
-        user_logs = logs[logs["username"] == st.session_state.username]
-        if not user_logs.empty:
-            st.markdown("---")
-            st.subheader("📜 Your Chat History")
-            for _, row in user_logs.iterrows():
-                st.markdown(
-                    f"""
-                    <div style='background-color:#f0f0f5;padding:10px;border-radius:10px;margin-bottom:5px; color:#000;'>
-                        👤 <strong>You:</strong><br><span style='font-size:15px'>{row['user_message']}</span>
-                    </div>
-                    <div style='background-color:#e6f2ff;padding:10px;border-radius:10px;margin-bottom:10px; color:#000;'>
-                        🤖 <strong>Therapist:</strong><br><span style='font-size:15px'>{row['bot_response']}</span>
-                    </div>
-                    <div style='font-size:12px;color:#888;margin-bottom:15px;'>🕒 {row['timestamp']}</div>
-                    """,
-                    unsafe_allow_html=True
-                )
-    except FileNotFoundError:
-        st.info("No chat history found.")
+    logs = safe_load_chat_logs()
+    user_logs = logs[logs["email"] == st.session_state.email]
+
+    if not user_logs.empty:
+        for _, row in user_logs.iloc[::-1].iterrows():
+            st.markdown(
+                f"""
+                <div style='font-size:12px;color:#888;margin-bottom:5px;'>🕒 {pd.to_datetime(row['timestamp']).strftime('%Y-%m-%d %H:%M:%S')}</div>
+                <div style='background-color:#f0f0f5;padding:10px;border-radius:10px;margin-bottom:5px; color:#000;'>
+                    🙎🏻‍♂️ <strong>You:</strong><br><span style='font-size:15px'>{row['user_message']}</span>
+                </div>
+                <div style='background-color:#e6f2ff;padding:10px;border-radius:10px;margin-bottom:10px; color:#000;'>
+                    👤 <strong>Buddy:</strong><br><span style='font-size:15px'>{row['bot_response']}</span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    else:
+        st.info("No chat history found. Start chatting!")

@@ -1,4 +1,5 @@
-username,password
-user1,$2b$12$aE1p6HOelYM8ACxDuyX8vOzAJcZnM0hl7zcsm1WXCmA.p7MuPZ8La
-user2,$2b$12$MdC1gCRgJ5VPvQaxvc.xJeRUKPnVVY4LNZRirYGQe3jA6gWxKunEm
-dwai,$2b$12$K2Wpb6Qq6BJex3kqOh99vu/AgdFIRpiOjTczPR7VEFE0I3X2QNtXu
+name,email,password,role
+,,$2b$12$aE1p6HOelYM8ACxDuyX8vOzAJcZnM0hl7zcsm1WXCmA.p7MuPZ8La,
+,,$2b$12$MdC1gCRgJ5VPvQaxvc.xJeRUKPnVVY4LNZRirYGQe3jA6gWxKunEm,
+,,$2b$12$K2Wpb6Qq6BJex3kqOh99vu/AgdFIRpiOjTczPR7VEFE0I3X2QNtXu,
+p1,p1@gmail.com,$2b$12$DpgHrlKsCs6ZHFufPcQuWeoaujgI6FBtdBcrBFVB5xnQJAWJP/r4.,patient

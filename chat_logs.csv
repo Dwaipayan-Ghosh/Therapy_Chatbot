@@ -1,4 +1,4 @@
-username,timestamp,user_message,bot_response
+email,timestamp,user_message,bot_response
 user1,2025-05-23 01:08:17.239492,How can I make friends,"Friendships can be a great source of support and joy. Can you tell me more about what's been on your mind lately? What's been making you anxious, and how's that impacting your daily life?"
 user1,2025-05-23 01:10:00.234537,I don't have friends,Feeling isolated can be really tough. Have you lost touch with friends or is this a recent realization? What do you think might be contributing to this feeling?
 user1,2025-05-23 01:12:14.217323,I think I have lost touch with school friends ,That can be really tough! Losing touch with friends can be a lonely experience. What do you think might have contributed to this drift apart?
@@ -9,3 +9,4 @@ user1,2025-05-23 01:18:50.824235,I have mood swings which make me hungry at rand
 user1,2025-05-23 01:33:43.800851,I am afraid my girlfriend will leave me,That can be a really scary and vulnerable feeling. Can you tell me more about what's been going on with you and your girlfriend? What are some specific concerns you have?
 user1,2025-05-23 01:38:26.123018,I think she is cheating on me,I'm so sorry you're going through this. It's understandable to feel upset and uncertain. Can you tell me more about what's been going on between you and this person?
 user1,2025-05-23 01:41:31.226950,Should I talk to her directly about this or wait for her actions?,It sounds like you're thinking about a conversation with someone. Can you tell me more about that? What's going through your mind when you think about talking to her?
+p1@gmail.com,2025-06-04 18:44:35.622114,"Hi, I am sad",Sorry to hear that you're feeling sad. Can you tell me more about what's going on? What's been on your mind lately?

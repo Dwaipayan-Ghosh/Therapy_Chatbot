@@ -1,12 +1,61 @@
 import streamlit as st
 import pandas as pd
 import bcrypt
-from datetime import datetime
+from datetime import datetime, date
 import os
-from local_model.therapyllama import generate_response  # Ensure this exists
+import sqlite3
+import requests
+import json
+from local_model.therapyllama import generate_response
 
+# --- Constants ---
 USERS_FILE = "users.csv"
 CHAT_LOGS_FILE = "chat_logs.csv"
+DB_FILE = "global.db"
+API_BASE_URL = "http://127.0.0.1:5000"
+
+EMOJI_MOODS = {
+    "Joy": 0.9, "Contentment": 0.8, "Peacefulness": 0.7, "Gratitude": 0.8,
+    "Hope": 0.6, "Love": 0.9, "Excitement": 0.7, "Enthusiasm": 0.7,
+    "Awe": 0.6, "Interest": 0.5, "Pride": 0.6, "Amusement": 0.7,
+    "Relief": 0.6, "Compassion": 0.7, "Serenity": 0.8,
+    "Sadness": -0.6, "Anxiety": -0.7, "Anger": -0.8, "Fear": -0.9,
+    "Guilt": -0.7, "Shame": -0.8, "Disgust": -0.7, "Frustration": -0.6,
+    "Disappointment": -0.6, "Worry": -0.7, "Stress": -0.8, "Loneliness": -0.7
+}
+
+# --- DB Initialization ---
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS mood_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            email TEXT,
+            datetime TEXT,
+            mood TEXT,
+            score REAL
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def save_mood_to_db(username, email, mood):
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute(
+            "INSERT INTO mood_logs (username, email, datetime, mood, score) VALUES (?, ?, ?, ?, ?)",
+            (username, email, datetime.now().isoformat(), mood, EMOJI_MOODS[mood])
+        )
+        conn.commit()
+    except Exception as e:
+        st.error(f"DB Insert Error: {e}")
+    finally:
+        conn.close()
 
 # --- User Management ---
 def load_users():
@@ -73,6 +122,46 @@ def get_bot_response(user_input):
     )
     return generate_response(prompt)
 
+# --- API Helper ---
+def post_data(endpoint, data):
+    url = f"{API_BASE_URL}{endpoint}"
+    headers = {'Content-Type': 'application/json'}
+    try:
+        response = requests.post(url, json=data, headers=headers)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        error_message = "Network error or server unavailable."
+        if hasattr(e, 'response') and e.response is not None:
+            try:
+                error_details = e.response.json()
+                error_message = error_details.get('message', e.response.reason or e.response.text)
+            except json.JSONDecodeError:
+                error_message = e.response.text
+            if e.response.status_code == 400:
+                error_message = error_details.get('message', f"Bad request: {e.response.text}")
+        st.error(f"Operation failed: {error_message}")
+        return None 
+    except json.JSONDecodeError:
+        st.error(f"Error decoding JSON response from {url}. Server response: {response.text}")
+        return None
+
+# --- Mood Entry UI ---
+def mood_entry_ui():
+    st.header(f"📝 Record Mood for {st.session_state.name}")
+    with st.form("mood_entry_form"):
+        today = date.today()
+        date_selected = st.date_input("Date", value=today)
+        mood_selected = st.selectbox("How are you feeling today?", list(EMOJI_MOODS.keys()))
+        submitted = st.form_submit_button("Save Mood Entry")
+
+        if submitted:
+            if not st.session_state.email or not st.session_state.name:
+                st.error("Session error. Please log in again.")
+                return
+            save_mood_to_db(st.session_state.name, st.session_state.email, mood_selected)
+            st.success(f"Thanks for sharing. Mood '{mood_selected}' recorded.")
+
 # --- Session Init ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -121,7 +210,7 @@ elif not st.session_state.logged_in and menu == "Login":
         else:
             st.warning("Please enter both email and password.")
 
-# --- Main Chat Interface ---
+# --- Main Interface ---
 if st.session_state.logged_in:
     st.title("💬 TalkBuddy")
     st.markdown(f"Welcome, **{st.session_state.name}** 👋 ({st.session_state.role})")
@@ -135,48 +224,59 @@ if st.session_state.logged_in:
             st.session_state.role = ""
             st.rerun()
 
-    if "input_text_value" not in st.session_state:
-        st.session_state.input_text_value = ""
+    # --- Patient Interface ---
+    if st.session_state.role == "patient":
+        mood_entry_ui()
 
-    user_input = st.text_input("You:", key="user_input_text", value=st.session_state.input_text_value)
+        st.markdown("---")
+        st.subheader("💬 Chat With Buddy")
 
-    col_send, col_delete = st.columns([1, 2])
-    with col_send:
-        if st.button("Send", key="send_button"):
-            if user_input.strip():
-                with st.spinner("Buddy is typing..."):
-                    bot_reply = get_bot_response(user_input)
-                save_chat(st.session_state.email, user_input, bot_reply)
-                st.session_state.input_text_value = ""
+        if "input_text_value" not in st.session_state:
+            st.session_state.input_text_value = ""
+
+        user_input = st.text_input("You:", key="user_input_text", value=st.session_state.input_text_value)
+
+        col_send, col_delete = st.columns([1, 2])
+        with col_send:
+            if st.button("Send", key="send_button"):
+                if user_input.strip():
+                    with st.spinner("Buddy is typing..."):
+                        bot_reply = get_bot_response(user_input)
+                    save_chat(st.session_state.email, user_input, bot_reply)
+                    st.session_state.input_text_value = ""
+                    st.rerun()
+                else:
+                    st.warning("Please type a message to send.")
+
+        with col_delete:
+            if st.button("Delete My Chat History", key="delete_history_button"):
+                delete_chat(st.session_state.email)
+                st.success("Your chat history has been deleted.")
                 st.rerun()
-            else:
-                st.warning("Please type a message to send.")
 
-    with col_delete:
-        if st.button("Delete My Chat History", key="delete_history_button"):
-            delete_chat(st.session_state.email)
-            st.success("Your chat history has been deleted.")
-            st.rerun()
+        st.markdown("---")
+        st.subheader("📜 Your Chat History")
 
-    st.markdown("---")
-    st.subheader("📜 Your Chat History")
+        logs = safe_load_chat_logs()
+        user_logs = logs[logs["email"] == st.session_state.email]
 
-    logs = safe_load_chat_logs()
-    user_logs = logs[logs["email"] == st.session_state.email]
+        if not user_logs.empty:
+            for _, row in user_logs.iloc[::-1].iterrows():
+                st.markdown(
+                    f"""
+                    <div style='font-size:12px;color:#888;margin-bottom:5px;'>🕒 {pd.to_datetime(row['timestamp']).strftime('%Y-%m-%d %H:%M:%S')}</div>
+                    <div style='background-color:#f0f0f5;padding:10px;border-radius:10px;margin-bottom:5px; color:#000;'>
+                        🙎🏻‍♂️ <strong>You:</strong><br><span style='font-size:15px'>{row['user_message']}</span>
+                    </div>
+                    <div style='background-color:#e6f2ff;padding:10px;border-radius:10px;margin-bottom:10px; color:#000;'>
+                        👤 <strong>Buddy:</strong><br><span style='font-size:15px'>{row['bot_response']}</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+        else:
+            st.info("No chat history found. Start chatting!")
 
-    if not user_logs.empty:
-        for _, row in user_logs.iloc[::-1].iterrows():
-            st.markdown(
-                f"""
-                <div style='font-size:12px;color:#888;margin-bottom:5px;'>🕒 {pd.to_datetime(row['timestamp']).strftime('%Y-%m-%d %H:%M:%S')}</div>
-                <div style='background-color:#f0f0f5;padding:10px;border-radius:10px;margin-bottom:5px; color:#000;'>
-                    🙎🏻‍♂️ <strong>You:</strong><br><span style='font-size:15px'>{row['user_message']}</span>
-                </div>
-                <div style='background-color:#e6f2ff;padding:10px;border-radius:10px;margin-bottom:10px; color:#000;'>
-                    👤 <strong>Buddy:</strong><br><span style='font-size:15px'>{row['bot_response']}</span>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-    else:
-        st.info("No chat history found. Start chatting!")
+    # --- Therapist Interface ---
+    elif st.session_state.role == "therapist":
+        st.info("🧑‍⚕️ This is the **Therapist Dashboard**. Features coming soon.")

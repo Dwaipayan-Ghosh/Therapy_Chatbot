@@ -6,3 +6,12 @@ seaborn
 torch
 bcrypt
 llama-cpp-python
+bcrypt
+Flask
+Flask-SQLAlchemy
+SQLAlchemy
+pandas
+requests
+streamlit
+scikit-learn 
+numpy

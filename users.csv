@@ -3,3 +3,5 @@ name,email,password,role
 ,,$2b$12$MdC1gCRgJ5VPvQaxvc.xJeRUKPnVVY4LNZRirYGQe3jA6gWxKunEm,
 ,,$2b$12$K2Wpb6Qq6BJex3kqOh99vu/AgdFIRpiOjTczPR7VEFE0I3X2QNtXu,
 p1,p1@gmail.com,$2b$12$DpgHrlKsCs6ZHFufPcQuWeoaujgI6FBtdBcrBFVB5xnQJAWJP/r4.,patient
+t1,t1@gmail.com,$2b$12$HuD.Ef2DVy06hZcTvgi8Ge2jBVSTHDjFP4tN0ra/VvZKZ7RqF63EO,therapist
+Vaibhavi,v1@gmail.com,$2b$12$SLlr4vYJZ0hBzhLbSVrEouOTAOyhQRuiWhCrMIrEwAZSSBcXuCNim,patient

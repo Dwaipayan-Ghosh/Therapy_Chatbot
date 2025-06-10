@@ -14,6 +14,7 @@ CHAT_LOGS_FILE = "chat_logs.csv"
 DB_FILE = "global.db"
 API_BASE_URL = "http://127.0.0.1:5000"
 
+
 EMOJI_MOODS = {
     "Joy": 0.9, "Contentment": 0.8, "Peacefulness": 0.7, "Gratitude": 0.8,
     "Hope": 0.6, "Love": 0.9, "Excitement": 0.7, "Enthusiasm": 0.7,
@@ -180,11 +181,10 @@ if not st.session_state.logged_in and menu == "Register":
         name = st.text_input("Full Name")
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
-        role = st.selectbox("Register as", options=["patient", "therapist"])
         submitted = st.form_submit_button("Register")
         if submitted:
             if name and email and password:
-                if signup_user(name, email, password, role):
+                if signup_user(name, email, password):
                     st.success("Account created! Please log in.")
                 else:
                     st.error("Email already exists.")

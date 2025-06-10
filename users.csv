@@ -5,3 +5,4 @@ name,email,password,role
 p1,p1@gmail.com,$2b$12$DpgHrlKsCs6ZHFufPcQuWeoaujgI6FBtdBcrBFVB5xnQJAWJP/r4.,patient
 t1,t1@gmail.com,$2b$12$HuD.Ef2DVy06hZcTvgi8Ge2jBVSTHDjFP4tN0ra/VvZKZ7RqF63EO,therapist
 Vaibhavi,v1@gmail.com,$2b$12$SLlr4vYJZ0hBzhLbSVrEouOTAOyhQRuiWhCrMIrEwAZSSBcXuCNim,patient
+ABC,abc@gmail.com,$2b$12$wlZ2cW/gEFNYotusLli66eixV8mawhezUxE.bka0ziW/DXQHpCwXm,patient

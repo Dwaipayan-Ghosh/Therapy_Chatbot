@@ -212,7 +212,7 @@ elif not st.session_state.logged_in and menu == "Login":
 
 # --- Main Interface ---
 if st.session_state.logged_in:
-    st.title("💬 TalkBuddy")
+    st.title("💬 CureMate")
     st.markdown(f"Welcome, **{st.session_state.name}** 👋 ({st.session_state.role})")
 
     _, col_logout = st.columns([2, 1])
@@ -229,7 +229,7 @@ if st.session_state.logged_in:
         mood_entry_ui()
 
         st.markdown("---")
-        st.subheader("💬 Chat With Buddy")
+        st.subheader("💬 Chat With Your Mate")
 
         if "input_text_value" not in st.session_state:
             st.session_state.input_text_value = ""
@@ -240,7 +240,7 @@ if st.session_state.logged_in:
         with col_send:
             if st.button("Send", key="send_button"):
                 if user_input.strip():
-                    with st.spinner("Buddy is typing..."):
+                    with st.spinner("Your Mate is typing..."):
                         bot_reply = get_bot_response(user_input)
                     save_chat(st.session_state.email, user_input, bot_reply)
                     st.session_state.input_text_value = ""

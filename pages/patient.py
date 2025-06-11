@@ -184,7 +184,7 @@ if not st.session_state.logged_in and menu == "Register":
         submitted = st.form_submit_button("Register")
         if submitted:
             if name and email and password:
-                if signup_user(name, email, password):
+                if signup_user(name, email, password ,"patient"):
                     st.success("Account created! Please log in.")
                 else:
                     st.error("Email already exists.")

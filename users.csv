@@ -1,7 +1,7 @@
 name,email,password,role
 p1,p1@gmail.com,$2b$12$DpgHrlKsCs6ZHFufPcQuWeoaujgI6FBtdBcrBFVB5xnQJAWJP/r4.,patient
 t1,t1@gmail.com,$2b$12$HuD.Ef2DVy06hZcTvgi8Ge2jBVSTHDjFP4tN0ra/VvZKZ7RqF63EO,therapist
-Vaibhavi,v1@gmail.com,$2b$12$SLlr4vYJZ0hBzhLbSVrEouOTAOyhQRuiWhCrMIrEwAZSSBcXuCNim,patient
+Vaibhavi,v1@gmail.com,$2b$12$iIgPWSwGrYeLSaDBluH8OuPFn/NighGG4EvAIKuZw29xAOnxReSqa,patient
 ABC,abc@gmail.com,$2b$12$wlZ2cW/gEFNYotusLli66eixV8mawhezUxE.bka0ziW/DXQHpCwXm,patient
 Anisha,101anishaa@gmail.com,$2b$12$NigmcTTAYx9DdRWy2DqDTOPiozLVVPt5bPCaV1/RLDJ.xV9XZOs1K,patient
 Test1,test1@gmail.com,$2b$12$UEC3OvXIYuvr0FuipDBGU.ZfeUa3T6XXD6UCLXSEvqE0LO9KYsqau,patient

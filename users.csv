@@ -1,10 +1,11 @@
 name,email,password,role
-,,$2b$12$aE1p6HOelYM8ACxDuyX8vOzAJcZnM0hl7zcsm1WXCmA.p7MuPZ8La,
-,,$2b$12$MdC1gCRgJ5VPvQaxvc.xJeRUKPnVVY4LNZRirYGQe3jA6gWxKunEm,
-,,$2b$12$K2Wpb6Qq6BJex3kqOh99vu/AgdFIRpiOjTczPR7VEFE0I3X2QNtXu,
 p1,p1@gmail.com,$2b$12$DpgHrlKsCs6ZHFufPcQuWeoaujgI6FBtdBcrBFVB5xnQJAWJP/r4.,patient
 t1,t1@gmail.com,$2b$12$HuD.Ef2DVy06hZcTvgi8Ge2jBVSTHDjFP4tN0ra/VvZKZ7RqF63EO,therapist
 Vaibhavi,v1@gmail.com,$2b$12$SLlr4vYJZ0hBzhLbSVrEouOTAOyhQRuiWhCrMIrEwAZSSBcXuCNim,patient
 ABC,abc@gmail.com,$2b$12$wlZ2cW/gEFNYotusLli66eixV8mawhezUxE.bka0ziW/DXQHpCwXm,patient
 Anisha,101anishaa@gmail.com,$2b$12$NigmcTTAYx9DdRWy2DqDTOPiozLVVPt5bPCaV1/RLDJ.xV9XZOs1K,patient
 Test1,test1@gmail.com,$2b$12$UEC3OvXIYuvr0FuipDBGU.ZfeUa3T6XXD6UCLXSEvqE0LO9KYsqau,patient
+Patient1,Patient1@gmail.com,$2b$12$bco90GbYfnIP1j19kjy6i.RNwm0NWPvBx9WFONl52BMDqRsCzilwO,patient
+Rainbow,rainbow@gmail.com,$2b$12$DAfw76FCODvvj1Qj1mJCb.uewG3RNhMYpIhLUyDNhUxhGOoopwvJ2,patient
+John,john@gmail.com,$2b$12$7BcFsIJ486AUu7CmAqIaxepQD6Y2wO5EnheQVbKbR9ypfuE8wcTsO,patient
+Patient2,p2@gmail.com,$2b$12$eRLNuPgN50t.1CQUcTGXmeFlrg90Wi43bg6sJPtq.jQ.kHylIIY3W,patient

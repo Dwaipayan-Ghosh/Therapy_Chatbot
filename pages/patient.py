@@ -1,17 +1,19 @@
 import streamlit as st
 import pandas as pd
 import bcrypt
-from datetime import datetime, date
+from datetime import datetime, date, timedelta # Import timedelta for date comparisons
 import os
-import sqlite3
+import sqlite3 # Keep this import, as the original code had it, even if global.db is gone.
 import requests
 import json
-from local_model.therapyllama import generate_response
+from local_model.therapyllama import generate_response # RESTORED: Original chatbot import
 
-# --- Constants ---
+# ─────────────────────────────
+# Constants
+# ─────────────────────────────
 USERS_FILE = "users.csv"
 CHAT_LOGS_FILE = "chat_logs.csv"
-DB_FILE = "global.db"
+MOOD_LOGS_FILE = "mood.csv" # New: CSV file for mood logs
 API_BASE_URL = "http://127.0.0.1:5000"
 
 
@@ -25,45 +27,88 @@ EMOJI_MOODS = {
     "Disappointment": -0.6, "Worry": -0.7, "Stress": -0.8, "Loneliness": -0.7
 }
 
-# --- DB Initialization ---
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS mood_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT,
-            email TEXT,
-            datetime TEXT,
-            mood TEXT,
-            score REAL
-        )
-    ''')
-    conn.commit()
-    conn.close()
+# ─────────────────────────────
+# CSV Mood Logging Functions (Replaced SQLite)
+# ─────────────────────────────
+def safe_load_mood_logs():
+    """Safely loads mood logs from mood.csv, ensuring 'datetime' column is proper datetime type.
+    Handles missing or empty files by creating an appropriately typed empty DataFrame.
+    """
+    # Define the columns and their desired dtypes for an empty DataFrame
+    columns_and_dtypes = {
+        "username": str,
+        "email": str,
+        "datetime": 'datetime64[ns]', # Explicitly set for datetime
+        "mood": str,
+        "score": float
+    }
+    
+    if os.path.exists(MOOD_LOGS_FILE) and os.path.getsize(MOOD_LOGS_FILE) > 0:
+        try:
+            df = pd.read_csv(MOOD_LOGS_FILE)
+            # Explicitly convert 'datetime' column to datetime objects
+            # 'errors='coerce'' will turn unparseable dates into NaT (Not a Time)
+            df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
+            return df
+        except pd.errors.EmptyDataError:
+            # File exists but is empty
+            st.info(f"'{MOOD_LOGS_FILE}' exists but is empty. Initializing empty DataFrame with correct dtypes.")
+            return pd.DataFrame(columns=columns_and_dtypes.keys()).astype(columns_and_dtypes)
+        except Exception as e:
+            # Catch other potential errors during file reading
+            st.error(f"Error loading '{MOOD_LOGS_FILE}': {e}. Initializing empty DataFrame.")
+            return pd.DataFrame(columns=columns_and_dtypes.keys()).astype(columns_and_dtypes)
+    else:
+        # File does not exist, create an empty DataFrame with proper dtypes
+        st.info(f"'{MOOD_LOGS_FILE}' not found. Initializing empty DataFrame with correct dtypes.")
+        return pd.DataFrame(columns=columns_and_dtypes.keys()).astype(columns_and_dtypes)
 
-init_db()
+def save_mood_entry_to_csv(username, email, mood, entry_date: date):
+    """
+    Saves a new mood entry to mood.csv. Prevents duplicate entries for the same user on the same date.
+    """
+    current_mood_logs = safe_load_mood_logs()
+    
+    # Filter out rows where 'datetime' could not be parsed (NaT values) before checking for duplicates
+    valid_mood_logs = current_mood_logs.dropna(subset=['datetime'])
 
-def save_mood_to_db(username, email, mood):
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        c.execute(
-            "INSERT INTO mood_logs (username, email, datetime, mood, score) VALUES (?, ?, ?, ?, ?)",
-            (username, email, datetime.now().isoformat(), mood, EMOJI_MOODS[mood])
-        )
-        conn.commit()
-    except Exception as e:
-        st.error(f"DB Insert Error: {e}")
-    finally:
-        conn.close()
+    # Check for existing mood entry for this user on this specific date
+    if not valid_mood_logs.empty:
+       # Create 'date_only' column on the valid subset for comparison
+       valid_mood_logs['date_only'] = valid_mood_logs['datetime'].dt.date
+       if ((valid_mood_logs['email'] == email) & (valid_mood_logs['date_only'] == entry_date)).any():
+            st.warning(f"You have already recorded a mood for {entry_date}. Please select another date or consider editing an existing entry.")
+            return False # Indicate that save was not performed
+    
+    # If no existing entry, proceed with insertion
+    # Combine selected date with current time to form a full timestamp
+    full_datetime_to_save = datetime.combine(entry_date, datetime.now().time())
+    
+    new_entry_df = pd.DataFrame([{
+        "username": username,
+        "email": email,
+        "datetime": full_datetime_to_save, # Store as datetime object, pandas will save as ISO string
+        "mood": mood,
+        "score": EMOJI_MOODS[mood]
+    }])
+    
+    # Reconstruct the full DataFrame by concatenating the valid_mood_logs and the new entry
+    # and then saving. Ensure datetime column from new_entry_df is also proper datetime type.
+    updated_mood_logs = pd.concat([valid_mood_logs.drop(columns=['date_only']) if 'date_only' in valid_mood_logs.columns else valid_mood_logs, new_entry_df], ignore_index=True)
+    
+    updated_mood_logs.to_csv(MOOD_LOGS_FILE, index=False)
+    st.success(f"Thanks for sharing. Mood '{mood}' recorded for {entry_date}.")
+    return True # Indicate successful save
 
-# --- User Management ---
+# ─────────────────────────────
+# User Management (unchanged, uses users.csv)
+# ─────────────────────────────
 def load_users():
     try:
+        # Ensure 'role' is read as string to prevent issues with mixed types
         return pd.read_csv(USERS_FILE, dtype={"name": str, "email": str, "password": str, "role": str})
     except FileNotFoundError:
-        return pd.DataFrame(columns=["name", "email", "password", "role"])
+        return pd.DataFrame(columns=["name", "email", "password", "patient"])
 
 def save_users(users_df):
     users_df.to_csv(USERS_FILE, index=False)
@@ -86,7 +131,9 @@ def authenticate_user(email, password):
             return True, user.iloc[0]["name"], user.iloc[0]["role"]
     return False, None, None
 
-# --- Chat Logging ---
+# ─────────────────────────────
+# Chat Logging (unchanged, uses chat_logs.csv)
+# ─────────────────────────────
 def safe_load_chat_logs():
     if os.path.exists(CHAT_LOGS_FILE) and os.path.getsize(CHAT_LOGS_FILE) > 0:
         try:
@@ -109,7 +156,9 @@ def delete_chat(email):
     logs = logs[logs["email"] != email]
     logs.to_csv(CHAT_LOGS_FILE, index=False)
 
-# --- Therapy Bot Response ---
+# ─────────────────────────────
+# Therapy Bot Response (ORIGINAL LOGIC RESTORED)
+# ─────────────────────────────
 def get_bot_response(user_input):
     prompt = (
         "System: You are a therapy chatbot. Only respond to emotional or mental health-related questions. "
@@ -121,9 +170,11 @@ def get_bot_response(user_input):
         f"User: {user_input}\n"
         "Therapist:"
     )
-    return generate_response(prompt)
+    return generate_response(prompt) # RESTORED: Calling your local model
 
-# --- API Helper ---
+# ─────────────────────────────
+# API Helper (unchanged - if you use an external API)
+# ─────────────────────────────
 def post_data(endpoint, data):
     url = f"{API_BASE_URL}{endpoint}"
     headers = {'Content-Type': 'application/json'}
@@ -147,34 +198,41 @@ def post_data(endpoint, data):
         st.error(f"Error decoding JSON response from {url}. Server response: {response.text}")
         return None
 
-# --- Mood Entry UI ---
+# ─────────────────────────────
+# Mood Entry UI (Updated for CSV saving)
+# ─────────────────────────────
 def mood_entry_ui():
     st.header(f"📝 Record Mood for {st.session_state.name}")
     with st.form("mood_entry_form"):
         today = date.today()
-        date_selected = st.date_input("Date", value=today)
-        mood_selected = st.selectbox("How are you feeling today?", list(EMOJI_MOODS.keys()))
+        # Allow selecting date, default to today, and restrict to today or past
+        date_selected = st.date_input("Select Date for Mood Entry", value=today, max_value=today) 
+        mood_selected = st.selectbox("How are you feeling on this date?", list(EMOJI_MOODS.keys()))
         submitted = st.form_submit_button("Save Mood Entry")
 
         if submitted:
             if not st.session_state.email or not st.session_state.name:
                 st.error("Session error. Please log in again.")
                 return
-            save_mood_to_db(st.session_state.name, st.session_state.email, mood_selected)
-            st.success(f"Thanks for sharing. Mood '{mood_selected}' recorded.")
+            # Call the new CSV saving function
+            save_mood_entry_to_csv(st.session_state.name, st.session_state.email, mood_selected, date_selected)
 
-# --- Session Init ---
+
+# ─────────────────────────────
+# Session & Navigation (unchanged)
+# ─────────────────────────────
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.name = ""
     st.session_state.email = ""
     st.session_state.role = ""
 
-# --- Sidebar Navigation ---
 st.sidebar.title("Navigation")
 menu = st.sidebar.radio("Go to", ["Register", "Login"])
 
-# --- Registration Page ---
+# ─────────────────────────────
+# Registration Page (unchanged)
+# ─────────────────────────────
 if not st.session_state.logged_in and menu == "Register":
     st.markdown("<h2 style='text-align: center;'>Register New User</h2>", unsafe_allow_html=True)
     with st.form("signup_form"):
@@ -184,14 +242,16 @@ if not st.session_state.logged_in and menu == "Register":
         submitted = st.form_submit_button("Register")
         if submitted:
             if name and email and password:
-                if signup_user(name, email, password ,"patient"):
+                if signup_user(name, email, password ,"patient"): # Role is hardcoded as "patient"
                     st.success("Account created! Please log in.")
                 else:
                     st.error("Email already exists.")
             else:
                 st.warning("Please fill all fields.")
 
-# --- Login Page ---
+# ─────────────────────────────
+# Login Page (unchanged)
+# ─────────────────────────────
 elif not st.session_state.logged_in and menu == "Login":
     st.title("Login")
     email = st.text_input("Email")
@@ -210,7 +270,9 @@ elif not st.session_state.logged_in and menu == "Login":
         else:
             st.warning("Please enter both email and password.")
 
-# --- Main Interface ---
+# ─────────────────────────────
+# Main Interface (unchanged)
+# ─────────────────────────────
 if st.session_state.logged_in:
     st.title("💬 CureMate")
     st.markdown(f"Welcome, **{st.session_state.name}** 👋 ({st.session_state.role})")
@@ -241,7 +303,7 @@ if st.session_state.logged_in:
             if st.button("Send", key="send_button"):
                 if user_input.strip():
                     with st.spinner("Your Mate is typing..."):
-                        bot_reply = get_bot_response(user_input)
+                        bot_reply = get_bot_response(user_input) 
                     save_chat(st.session_state.email, user_input, bot_reply)
                     st.session_state.input_text_value = ""
                     st.rerun()
@@ -279,4 +341,4 @@ if st.session_state.logged_in:
 
     # --- Therapist Interface ---
     elif st.session_state.role == "therapist":
-        st.info("🧑‍⚕️ This is the **Therapist Dashboard**. Features coming soon.")
+        st.info("🧑‍⚕️ This is the **Therapist Dashboard**. Please open `therapist.py` in a separate Streamlit process to access therapist features.")

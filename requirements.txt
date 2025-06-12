@@ -15,3 +15,7 @@ requests
 streamlit
 scikit-learn 
 numpy
+requests 
+altair 
+scipy 
+statsmodels

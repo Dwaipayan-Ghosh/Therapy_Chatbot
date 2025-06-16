@@ -1,39 +1,45 @@
 import sqlite3
+import pandas as pd
+import os
 
-def view_database(db_path='global.db'):
+# File paths relative to this script
+csv_files = {
+    "users": "users.csv",
+    "therapists": "therapists.csv",
+    "therapistPatient": "therapistPatient.csv",
+    "mood": "mood.csv"
+}
+
+# Database file
+db_file = "global.db"
+
+# Connect to the SQLite database (creates it if not exists)
+conn = sqlite3.connect(db_file)
+cursor = conn.cursor()
+
+# Function to create table and import data
+def create_and_import(table_name, csv_path):
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+        df = pd.read_csv(csv_path)
+        df.to_sql(table_name, conn, if_exists='replace', index=False)
+        print(f"\n✅ Table created: {table_name}")
+        print(df)  # Show all data
+    except Exception as e:
+        print(f"❌ Failed to load {table_name}: {e}")
 
-        # List all tables
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = cursor.fetchall()
-        if not tables:
-            print("No tables found in the database.")
-            return
+# Load each CSV into the corresponding table
+for table, path in csv_files.items():
+    if os.path.exists(path):
+        create_and_import(table, path)
+    else:
+        print(f"❌ File not found: {path}")
 
-        print(f"Tables in '{db_path}':")
-        for table_name in tables:
-            table = table_name[0]
-            print(f"\nTable: {table}")
-            cursor.execute(f"SELECT * FROM {table} LIMIT 10;")
-            rows = cursor.fetchall()
+# Show all tables in the database
+print("\n📋 Tables in the database:")
+cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+tables = cursor.fetchall()
+for t in tables:
+    print(f" - {t[0]}")
 
-            # Get column names
-            cursor.execute(f"PRAGMA table_info({table});")
-            columns = [info[1] for info in cursor.fetchall()]
-            
-            # Print column headers
-            print(" | ".join(columns))
-            print("-" * (len(" | ".join(columns)) + 10))
-
-            # Print rows
-            for row in rows:
-                print(" | ".join(str(item) for item in row))
-
-        conn.close()
-    except sqlite3.Error as e:
-        print(f"An error occurred: {e}")
-
-if __name__ == "__main__":
-    view_database()
+# Close DB connection
+conn.close()

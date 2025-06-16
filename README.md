@@ -129,4 +129,5 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 4. Run the app
+```bash
 streamlit run main.py

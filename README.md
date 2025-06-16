@@ -115,6 +115,8 @@ THERAPY_CHATBOT/
 ```bash
 git clone https://github.com/Dwaipayan-Ghosh/Therapy_Chatbot
 
+2. Create virtual environment
+
 ```bash
 python -m venv venv
 # On Windows:
@@ -122,8 +124,9 @@ venv\Scripts\activate
 # On Linux/macOS:
 source venv/bin/activate
 
+3. Install requirements
 ```bash
 pip install -r requirements.txt
 
-```bash
+4. Run the app
 streamlit run main.py

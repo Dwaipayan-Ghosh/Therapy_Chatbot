@@ -56,20 +56,74 @@ It bridges the gap between therapy sessions using mood tracking, conversational 
 ## 📂 Project Structure
 
 ```bash
-CureMate/
+THERAPY_CHATBOT/
+├── local_model/ # Fine-tuned LLaMA 2 chatbot logic
+│ ├── psychologisv2-8.0B... # GGUF quantized model file
+│ └── therapyllama.py # Chatbot response logic
 │
-├── main.py                    # Entry point for Streamlit app
-├── therapist.py              # Therapist dashboard logic, GMM, ARIMA, Linear Regression logic
-├── patient.py               # Patient interface logic
+├── pages/ # Streamlit multipage views
+│ ├── patient.py # Patient dashboard
+│ └── therapist.py # Therapist dashboard
 │
-├── models/
-│   └── llama_finetuned/      # Saved LLaMA weights & tokenizer
+├── data files
+│ ├── users.csv # Registered users (patients & therapists)
+│ ├── chat_logs.csv # Stored chatbot interactions
+│ ├── mood.csv # Daily mood entries
+│ ├── therapistPatient.csv # Therapist–patient mapping
+│ ├── therapists.csv # Therapist records
+│ └── global.db # SQLite DB (viewed via view_db.py)
 │
-├── data/
-│   ├── users.csv             # User credentials
-│   ├── mood.csv              # Mood records
-│   ├── chat_logs.csv         # Chat history
-│   └── therapistpatient.csv  # Therapist-patient mappings
-│
-│
+├── main.py # Main entrypoint for the Streamlit app
+├── dev.py # Utility/test script
+├── train.py # Training script for mood classification
+├── test.ipynb # Notebook for model testing
+├── text_classification.py # GMM and ARIMA model logic
+├── view_db.py # View SQLite DB content
+├── requirements.txt # Python dependencies
 └── README.md
+---
+
+## 💡 Features
+
+🟢 For Patients:
+- Role-based login via Streamlit.
+- Submit mood via emoji/emotion dropdown.
+- Chat with a therapy-oriented LLaMA 2 chatbot.
+- View recent mood summaries and chatbot logs.
+
+🔵 For Therapists:
+- View all assigned patients.
+- Daily mood trend summary over 7, 15, and 30 days.
+- GMM-based emotional cluster analysis.
+- ARIMA-based 7-day emotional forecast.
+
+---
+
+## 🤖 AI Chatbot
+
+- Uses LLaMA 2–7B, finetuned on 100 CBT-based instruction-response pairs.
+- Model format: GGUF (4-bit quantized for local inference)
+- Handled via local_model/therapyllama.py
+- Responses are generated using context-aware instruction prompts.
+
+---
+
+## 🔧 Setup Instructions
+
+1. Clone the Repository:
+
+```bash
+git clone https://github.com/Dwaipayan-Ghosh/Therapy_Chatbot
+
+```bash
+python -m venv venv
+# On Windows:
+venv\Scripts\activate
+# On Linux/macOS:
+source venv/bin/activate
+
+```bash
+pip install -r requirements.txt
+
+```bash
+streamlit run main.py

@@ -1,1 +1,222 @@
+!pip install -q transformers datasets peft accelerate bitsandbytes trl einops
 
+
+from google.colab import drive
+drive.mount('/content/drive')
+output_dir = "/content/drive/MyDrive/llama_therapy_finetuned"
+
+
+import torch
+from datasets import load_dataset, Dataset
+from transformers import (
+    AutoTokenizer,
+    AutoModelForCausalLM,
+    TrainingArguments,
+    Trainer,
+    DataCollatorForLanguageModeling
+)
+from peft import LoraConfig, get_peft_model
+import pandas as pd
+
+
+file_path = "/content/mental_health_dataset (1).csv" #dataset path
+# Load the dataset using pandas and convert it to a Hugging Face dataset
+df = pd.read_csv(file_path)
+dataset = Dataset.from_pandas(df)
+
+
+if len(dataset.column_names) == 4:
+    dataset = dataset.rename_columns({
+        dataset.column_names[2]: "instruction",
+        dataset.column_names[3]: "response"
+    })
+
+
+def format_prompt(example):
+    return {
+        "text": f"### Instruction:\n{example['instruction']}\n\n### Response:\n{example['response']}"
+    }
+
+dataset = dataset.map(format_prompt)
+
+
+model_name = "meta-llama/Llama-2-7b-hf"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+tokenizer.pad_token = tokenizer.eos_token
+
+
+def tokenize_function(examples):
+    return tokenizer(
+        examples["text"],
+        truncation=True,
+        padding="max_length",
+        max_length=512,
+    )
+
+tokenized_dataset = dataset.map(tokenize_function, batched=True)
+
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    load_in_4bit=True,
+    device_map="auto",
+    bnb_4bit_compute_dtype=torch.float16
+)
+
+peft_config = LoraConfig(
+    r=16,
+    lora_alpha=32,
+    target_modules=["q_proj", "v_proj"],
+    lora_dropout=0.05,
+    bias="none",
+    task_type="CAUSAL_LM"
+)
+
+model = get_peft_model(model, peft_config)
+
+
+
+
+from transformers import logging as hf_logging
+hf_logging.set_verbosity_error()
+
+training_args = TrainingArguments(
+    output_dir=output_dir,
+    per_device_train_batch_size=1,
+    gradient_accumulation_steps=2,
+    num_train_epochs=5,
+    learning_rate=2e-4,
+    fp16=True,
+    save_strategy="epoch",
+    logging_steps=10,
+    report_to="none"
+)
+
+tiny_dataset = tokenized_dataset.select(range(min(100, len(tokenized_dataset))))
+
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=tiny_dataset,
+    tokenizer=tokenizer,
+    data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False),
+)
+
+trainer.train()
+
+model.save_pretrained(output_dir)
+tokenizer.save_pretrained(output_dir)
+
+print(f"✅ Model successfully saved to your Google Drive folder: {output_dir}")
+
+
+
+model = AutoModelForCausalLM.from_pretrained(
+    output_dir,
+    load_in_4bit=True,
+    device_map="auto",
+    bnb_4bit_compute_dtype=torch.float16
+)
+
+
+model = get_peft_model(model, peft_config)
+
+
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=tiny_dataset,
+    tokenizer=tokenizer,
+    data_collator=DataCollatorForLanguageModeling(tokenizer, mlm=False),
+)
+
+trainer.train()
+
+
+import re
+
+
+blacklisted_keywords = [
+    "math", "calculate", "calculation", "equation", "solve", "simplify",
+    "derivative", "integration", "integrate", "differential", "algebra",
+    "geometry", "trigonometry", "statistics", "mean", "median", "mode",
+    "probability", "factorial", "square root", "logarithm", "prime number",
+
+    "area", "volume", "capital of", "country", "continent", "population",
+    "currency", "distance", "border", "geography", "mountain", "river", "ocean",
+    "largest country", "smallest country", "map", "longitude", "latitude",
+
+    "science", "physics", "biology", "chemistry", "chemical", "formula",
+    "molecule", "atom", "invention", "inventor", "who discovered", "speed of",
+    "gravity", "mass", "acceleration", "temperature", "energy", "force",
+    "light year", "electrons", "magnet", "friction",
+
+    "history", "president", "prime minister", "who was", "when was", "year",
+    "war", "revolution", "independence", "colonial", "king", "queen",
+    "government", "constitution", "freedom", "empire",
+
+    "fruit", "animal", "plant", "color", "colour", "taste", "smell", "sound",
+    "what is the", "name of", "which is", "how many", "largest", "smallest",
+    "oldest", "youngest", "deepest", "tallest", "fastest", "slowest",
+
+    "language", "translate", "meaning of", "definition", "grammar",
+    "synonym", "antonym", "pronunciation", "spelling", "how to write",
+
+    "planet", "star", "zodiac", "moon"
+]
+
+def is_relevant(input_text):
+    # Keyword-based check
+    lowered = input_text.lower()
+    if any(kw in lowered for kw in blacklisted_keywords):
+        return False
+
+    # Math symbol pattern check
+    math_pattern = r"[\d\+\-\*/\=\^()]"
+    math_expr = re.findall(math_pattern, input_text)
+    if len(math_expr) >= 3:  # It's likely a math or symbolic question
+        return False
+
+    return True
+
+
+def generate_response(user_input):
+    if not is_relevant(user_input):
+        return "I'm here to support your mental and emotional well-being. Let's focus on how you're feeling today."
+
+    prompt = f"### Instruction:\n{user_input}\n\n### Response:\n"
+    output = generator(prompt, max_new_tokens=100, do_sample=True, top_k=50, top_p=0.9)
+    return output[0]['generated_text'].split("### Response:")[-1].strip()
+
+# 🔍 Example test
+inputs = [
+    "I feel very anxious and lonely lately. What should I do?",
+    "What is the capital of France?",
+    "Sometimes I get overwhelmed for no reason.",
+    "Can you solve 2+2 for me?"
+]
+
+for text in inputs:
+    print(f"👤 You: {text}")
+    print(f"🤖 Bot: {generate_response(text)}\n")
+
+
+
+
+
+
+#our result : 
+
+#👤 You: I feel very anxious and lonely lately. What should I do?
+#🤖 Bot: Response: I understand that you are feeling lonely and anxious. This can be a difficult time for some people. Loneliness can cause a range of emotional, physical, and mental symptoms. The following are some strategies you can use to help you cope with loneliness:
+
+#1. Connect with others: The first step in coping with loneliness is to connect with others. It may take some time to find people who are interested in your company and who
+
+#👤 You: What is the capital of France?
+#🤖 Bot: 🧘 I'm here to support your mental and emotional well-being. Let's focus on how you're feeling today.
+
+#👤 You: Sometimes I get overwhelmed for no reason.
+#🤖 Bot: Response: It sounds like you might be experiencing some emotional upheaval or stress. Sometimes it's helpful to talk through your feelings and share them with a trusted friend or family member. Sometimes it's also helpful to take some time for yourself to do something that makes you feel good. For example, you might want to try a new hobby or activity that you've been wanting to try. You might also want to try relaxation techniques like deep breathing or
+
+#👤 You: Can you solve 2+2 for me?
+#🤖 Bot: 🧘 I'm here to support your mental and emotional well-being. Let's focus on how you're feeling today.
